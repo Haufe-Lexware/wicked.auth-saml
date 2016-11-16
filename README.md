@@ -2,7 +2,7 @@
 
 This repository contains the source code for a wicked.haufe.io Authorization Server needed to implement the OAuth 2.0 Implicit Flow in conjunction with SAML Web SSO (identity federation).
 
-For testing purposes, there is a pre-built docker image (`haufelexware/wicked.auth-saml`) with this repository you may use. It's not advisable to use this image in production; please fork it, copy it, or similar, and build your own image which you know to work with your specific Web SSO environment.
+For testing purposes, there is a pre-built docker image (`haufelexware/wicked.auth-saml:dev`) with this repository you may use. It's not advisable to use this image in production; please fork it, copy it, or similar, and build your own image which you know to work with your specific Web SSO environment.
 
 ## Add `auth-saml` to your environment (using `docker-compose`)
 
