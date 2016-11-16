@@ -1,0 +1,130 @@
+#!/usr/bin/env node
+
+'use strict';
+
+/**
+ * Module dependencies.
+ */
+
+const app = require('../app');
+const debug = require('debug')('auth-saml:server');
+const http = require('http');
+const async = require('async');
+const wicked = require('wicked-sdk');
+const wickedSaml = require('wicked-saml');
+
+let authServerId = 'auth-saml';
+if (process.env.AUTH_SERVER_NAME) {
+    authServerId = process.env.AUTH_SERVER_NAME;
+}
+
+console.log('Auth Server ID used: ' + authServerId + ', override with AUTH_SERVER_NAME.');
+app.set('auth_server', authServerId);
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+const port = normalizePort(process.env.PORT || '3011');
+app.set('port', port);
+
+/**
+ * Create HTTP server.
+ */
+
+let server = null;
+
+async.series({
+    init: callback => wicked.initialize(callback),
+    waitForKong: callback => wicked.awaitKongAdapter(callback),
+    initMachineUser: callback => wicked.initMachineUser(authServerId, callback),
+    initSaml: callback => wickedSaml.initialize(wicked, authServerId, callback),
+    initApp: callback => app.initApp(callback)
+}, function (err, results) {
+    console.error(err);
+    if (err)
+        throw err;
+
+    // For most of the above steps, we don't need any return value;
+    // only exception are the authentication settings which also should
+    // contain the ecom settings.
+
+    // Store the auth-server settings.
+    app.authConfig = wickedSaml.getConfig();
+    debug("Auth Server configuration:");
+    debug(app.authConfig);
+    if (!app.authConfig.profile || !app.authConfig.profile.authenticated_userid)
+        throw new Error('The property saml.profile.authenticated_userid is mandatory.');
+
+    console.log('Kong Adapter: ' + wicked.getInternalKongAdapterUrl());
+
+    server = http.createServer(app);
+
+    /**
+     * Listen on provided port, on all network interfaces.
+     */
+
+    server.listen(port);
+    server.on('error', onError);
+    server.on('listening', onListening);
+});
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+    const port = parseInt(val, 10);
+
+    if (isNaN(port)) {
+        // named pipe
+        return val;
+    }
+
+    if (port >= 0) {
+        // port number
+        return port;
+    }
+
+    return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+    if (error.syscall !== 'listen') {
+        throw error;
+    }
+
+    const bind = typeof port === 'string'
+        ? 'Pipe ' + port
+        : 'Port ' + port;
+
+    // handle specific listen errors with friendly messages
+    switch (error.code) {
+        case 'EACCES':
+            console.error(bind + ' requires elevated privileges');
+            process.exit(1);
+            break;
+        case 'EADDRINUSE':
+            console.error(bind + ' is already in use');
+            process.exit(1);
+            break;
+        default:
+            throw error;
+    }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+    const addr = server.address();
+    const bind = typeof addr === 'string'
+        ? 'pipe ' + addr
+        : 'port ' + addr.port;
+    debug('Listening on ' + bind);
+}
