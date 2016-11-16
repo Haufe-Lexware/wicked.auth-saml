@@ -121,6 +121,33 @@ $ openssl req -x509 -newkey rsa:2048 -keyout saml-key.pem -out saml-cert.pem -no
 
 Paste the content of `saml-cert.pem` into the `SAML_SP_CERTIFICATE` environment variable, and `saml-key.pem` into `SAML_SP_PRIVATE_KEY`. Please make sure that the kickstarter encrypts at least the private key in your configuration.
 
+## Additional end points
+
+### Retrieving the profile
+
+As an SPA, you may do a CORS call to the `/auth-saml/profile` end point to retrieve the profile the SAML IdP passed on to the Authorization Server. It will be formatted as specified in the `profile` property of the configuration.
+
+Please note the following:
+
+* This call will only succeed via the same user agent as did the SAML login on the Authorization Server (via CORS)
+* The CORS call **must** pass its credentials (`withCredentials: true` with `XMLHttpRequest` or `credentials: 'include'` with `fetch`)
+* Only CORS calls from the same `Origin` as the SPA itself (i.e. the redirect URI which was specified for it in the API Portal) will succeed, all others will be rejected
+
+### Renewing the Access Token
+
+The end point `/auth-saml/heartbeat` can be used to - via CORS/AJAX - renew the access token, as long as the User Agent the SPA lives in still has a valid session with Authorization Server.
+
+The same restrictions as for the `/auth-saml/profile` end point apply: Credentials must be passed, and the same `Origin`, and same User Agent.
+
+If successful, the end point will reply with the following content:
+
+```json
+{
+  "access_token": "sifzeriuotzhi4e5o84e653487594385",
+  "expires_in": 3600,
+  "token_type:" "bearer"
+}
+```
 
 ## Adding Authorization
 
