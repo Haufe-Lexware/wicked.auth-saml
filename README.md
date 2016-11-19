@@ -49,7 +49,8 @@ Open up the `auth-saml.json` file in the `static/auth-servers` directory in an e
   "id": "auth-saml",
   "name": "auth-saml",
   "desc": "Authorization Server SAML Web SSO",
-  "url": "https://${PORTAL_NETWORK_APIHOST}/auth-saml/api/{{apiId}}?client_id=(your app's client id)",
+  "url": "https://${PORTAL_NETWORK_APIHOST}/auth-saml/api/{{apiId}}?client_id=<your app's client id>&response_type=token&redirect_uri=<your app's redirect uri>[&state=<client state>]",
+  "urlDescription": "In case you need an access token, call the above link with your `client_id` (for the subscribed API) substituted in the link. In case the authentication is successful, you will get called back at your registered `redirect_uri` with the access token attached in the fragment of the URI. Any `state` you pass in will get passed back with the access token, as an additional query parameter `&state=<...>`.",
   "config": {
     "api": {
       "upstream_url": "http://auth-saml:3011",

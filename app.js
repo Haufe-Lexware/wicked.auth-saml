@@ -88,10 +88,16 @@ app.initApp = function (callback) {
     app.get('/auth-saml/api/:apiId', function (req, res, next) {
         const apiId = req.params.apiId;
         const clientId = req.query.client_id;
-        debug('/auth-saml/' + apiId + '?client_id=' + clientId);
-        if (!clientId) {
+        const responseType = req.query.response_type;
+        const givenRedirectUri = req.query.redirect_uri;
+        const givenState = req.query.state;
+        debug('/auth-saml/' + apiId + '?client_id=' + clientId + '&response_type=' + responseType);
+        if (givenState)
+            debug('given state: ' + givenState);
+        if (!clientId)
             return next(makeError('The query parameter client_id is missing.', 400));
-        }
+        if (responseType !== 'token')
+            return next(utils.makeError('Bad request. Parameter response_type is missing or faulty. Currently, only "token" is supported.', 400));
 
         // Check whether we need to bother the SAML IdP or not.
         wicked.getSubscriptionByClientId(clientId, apiId, function (err, subsInfo) {
@@ -101,6 +107,12 @@ app.initApp = function (callback) {
             // Store data in the session.
             req.session.apiId = apiId;
             req.session.clientId = clientId;
+            req.session.responseType = responseType;
+            if (givenState)
+                req.session.state = givenState;
+            else if (req.session.state)
+                delete req.session.state;
+
             // Get a login URL for the SSO provider:
             wickedSaml.login(function (err, loginInfo) {
                 if (err)
@@ -132,11 +144,15 @@ app.initApp = function (callback) {
             return next(makeError('Invalid session state: Unknown destination API.', 500));
         if (!req.session.clientId)
             return next(makeError('Invalid session state: Unknown destination client ID.', 500));
+        if (!req.session.responseType)
+            return next(makeError('Invalid session state: Unknown response type.', 500));
 
         // Now we can pick this data from the session.
         const requestId = req.session.requestId;
         const apiId = req.session.apiId;
         const clientId = req.session.clientId;
+        const responseType = req.session.responseType;
+        const givenState = req.session.state;
 
         // Now what does we haves here.
         wickedSaml.assert(req, requestId, function (err, userInfo, samlResponse) {
@@ -180,7 +196,7 @@ app.initApp = function (callback) {
             // ====================================
 
             // And redirect back to web application
-            return redirectWithAccessToken(userInfo, res, next);
+            return redirectWithAccessToken(userInfo, givenState, res, next);
         });
     });
 
@@ -233,11 +249,11 @@ app.initApp = function (callback) {
             return jsonError(res, 'No session available. Cannot renew access token.', 403);
         const userInfo = req.session.userInfo;
         // Try to renew the token.
-        getRedirectUriWithAccessToken(userInfo, function (err, redirectUri) {
+        getRedirectUriWithAccessToken(userInfo, null, function (err, redirectUri) {
             if (err)
                 return jsonError(res, 'Failed to renew access token: ' + err.message, 500);
             // Parse the redirect URI, looks like this:
-            // https://sdfmlksd.com#access_token=4793ihfkdi4i37498374&expires_in=3600&token_type=bearer
+            // https://sdfmlksd.com#access_token=4793ihfkdi4i37498374&expires_in=3600&token_type=bearer[&state=...]
             let tokenData = null;
             try {
                 const parsedUri = URL.parse(redirectUri);
@@ -261,10 +277,10 @@ app.initApp = function (callback) {
         });
     });
 
-    function redirectWithAccessToken(userInfo, res, next) {
+    function redirectWithAccessToken(userInfo, givenState, res, next) {
         debug('redirectWithAccessToken()');
 
-        getRedirectUriWithAccessToken(userInfo, function (err, redirectUri) {
+        getRedirectUriWithAccessToken(userInfo, givenState, function (err, redirectUri) {
             if (err) {
                 return next(err);
             }
@@ -274,7 +290,7 @@ app.initApp = function (callback) {
         });
     }
 
-    function getRedirectUriWithAccessToken(userInfo, callback) {
+    function getRedirectUriWithAccessToken(userInfo, givenState, callback) {
         wicked.oauth2AuthorizeImplicit(userInfo, function (err, result) {
             if (err) {
                 debug('getRedirectUriWithAccessToken failed.');
@@ -287,11 +303,15 @@ app.initApp = function (callback) {
             if (!result.redirect_uri)
                 return callback(makeError('Did not receive redirect_uri from oauth2AuthorizeImplicit.', 500));
 
+            let clientRedirectUri = result.redirect_uri;
+            if (givenState)
+                clientRedirectUri += '&state=' + givenState;
+
             // Remember this redirect URI, as we allow that for CORS calls
-            utils.storeRedirectUriForCors(result.redirect_uri);
+            utils.storeRedirectUriForCors(clientRedirectUri);
 
             // Just return the string, not the object
-            callback(null, result.redirect_uri);
+            callback(null, clientRedirectUri);
         });
     }
 
