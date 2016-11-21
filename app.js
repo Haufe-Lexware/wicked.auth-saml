@@ -19,6 +19,7 @@ const FileStore = require('session-file-store')(session);
 const mustache = require('mustache');
 
 const utils = require('./utils');
+const authorization = require('./authorization');
 
 // Use default options, see https://www.npmjs.com/package/session-file-store
 const sessionStoreOptions = {};
@@ -96,8 +97,8 @@ app.initApp = function (callback) {
             debug('given state: ' + givenState);
         if (!clientId)
             return next(makeError('The query parameter client_id is missing.', 400));
-        if (responseType !== 'token')
-            return next(utils.makeError('Bad request. Parameter response_type is missing or faulty. Currently, only "token" is supported.', 400));
+        if (responseType !== 'token' && responseType !== 'code')
+            return next(utils.makeError('Bad request. Parameter response_type is missing or faulty. Only "token" and "code" are supported.', 400));
 
         // Check whether we need to bother the SAML IdP or not.
         wicked.getSubscriptionByClientId(clientId, apiId, function (err, subsInfo) {
@@ -186,17 +187,22 @@ app.initApp = function (callback) {
             debug('User info for implicit token creation:');
             debug(userInfo);
 
-            // ====================================
-            // ====================================
-            // This is an excellent place to put in
-            // some actual authorization and amend
-            // a "scope" property to the userInfo
-            // object, if you want to.
-            // ====================================
-            // ====================================
-
-            // And redirect back to web application
-            return redirectWithAccessToken(userInfo, givenState, res, next);
+            // If we have an authorization step, it's implemented in the
+            // authorization module. This would add any scopes, if needed.
+            authorization.applyUserScopes(userInfo, profile, samlResponse, req.session, function (err, userInfo) {
+                if (err) {
+                    // Propagate authorization errors to error handler.
+                    return next(err);
+                }
+                
+                if (responseType === 'token') {
+                    // And redirect back to web application
+                    return redirectWithAccessToken(userInfo, givenState, res, next);
+                } else if (responseType === 'code') {
+                    return redirectWithAuthorizationCode(userInfo, givenState, res, next);
+                }
+                return res.status(500).json({ message: 'Invalid response type: ' + responseType });
+            });
         });
     });
 
@@ -210,7 +216,7 @@ app.initApp = function (callback) {
 
         if (!profileConfig) {
             debug('There is no profile property in the saml configuration.');
-            return { message: 'Profile configuration missing'};
+            return { message: 'Profile configuration missing' };
         }
 
         const propNames = wickedSaml.getAttributeNames(samlResponse);
@@ -312,6 +318,33 @@ app.initApp = function (callback) {
 
             // Just return the string, not the object
             callback(null, clientRedirectUri);
+        });
+    }
+
+    function redirectWithAuthorizationCode(userInfo, givenState, res, next) {
+        debug('redirectWithAuthorizationCode()');
+
+        wicked.oauth2GetAuthorizationCode(userInfo, function (err, result) {
+            if (err) {
+                debug('oauth2GetAuthorizationCode failed.');
+                debug(err);
+                return next(err);
+            }
+
+            debug('Result of oauth2GetAuthorizationCode:');
+            debug(result);
+
+            if (!result.redirect_uri)
+                return callback(makeError('Did not receive redirect_uri from oauth2GetAuthorizationCode.', 500));
+
+            let clientRedirectUri = result.redirect_uri;
+            if (givenState)
+                clientRedirectUri += '&state=' + givenState;
+
+            // Remember this redirect URI, as we allow that for CORS calls
+            utils.storeRedirectUriForCors(clientRedirectUri);
+
+            res.redirect(clientRedirectUri);
         });
     }
 
