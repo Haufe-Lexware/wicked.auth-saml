@@ -32,6 +32,13 @@ if (process.env.AUTH_SERVER_SESSION_MINUTES) {
     sessionMinutes = Number(process.env.AUTH_SERVER_SESSION_MINUTES);
 }
 debug('Session duration: ' + sessionMinutes + ' minutes.');
+let BASE_URL = '/auth-saml';
+if (process.env.AUTH_SERVER_BASE) {
+    BASE_URL = process.env.AUTH_SERVER_BASE;
+    console.log('Using overridden base path: ' + BASE_URL);
+} else {
+    console.log('Using base path: ' + BASE_URL + ' (override with env var AUTH_SERVER_BASE)');
+}
 
 // Specify the session arguments. Used for configuring the session component.
 const sessionArgs = {
@@ -79,20 +86,20 @@ app.initApp = function (callback) {
     app.use(session(sessionArgs));
 
     // Delegate the metadata end point to the wicked SAML library
-    app.get('/auth-saml/metadata.xml', wickedSaml.metadata());
+    app.get(BASE_URL + '/metadata.xml', wickedSaml.metadata());
 
     // End point for authorization of web applications; looks like this:
     //   https://api.yourserver.com/auth-saml/some-api?client_id=id-from-api-portal
     // If the client ID checks out with wicked, it will go bother the SAML
     // IdP to get an identity back. If that succeeds, the /auth-saml/assert
     // end point will be called. 
-    app.get('/auth-saml/api/:apiId', function (req, res, next) {
+    app.get(BASE_URL + '/api/:apiId', function (req, res, next) {
         const apiId = req.params.apiId;
         const clientId = req.query.client_id;
         const responseType = req.query.response_type;
         const givenRedirectUri = req.query.redirect_uri;
         const givenState = req.query.state;
-        debug('/auth-saml/' + apiId + '?client_id=' + clientId + '&response_type=' + responseType);
+        debug(BASE_URL + '/' + apiId + '?client_id=' + clientId + '&response_type=' + responseType);
         if (givenState)
             debug('given state: ' + givenState);
         if (!clientId)
@@ -133,8 +140,8 @@ app.initApp = function (callback) {
         });
     });
 
-    app.post('/auth-saml/assert', function (req, res, next) {
-        debug('/auth-saml/assert');
+    app.post(BASE_URL + '/assert', function (req, res, next) {
+        debug(BASE_URL + '/assert');
 
         // Sanity check session state before we do more things
         if (!req.session)
@@ -194,7 +201,7 @@ app.initApp = function (callback) {
                     // Propagate authorization errors to error handler.
                     return next(err);
                 }
-                
+
                 if (responseType === 'token') {
                     // And redirect back to web application
                     return redirectWithAccessToken(userInfo, givenState, res, next);
@@ -240,16 +247,16 @@ app.initApp = function (callback) {
         return profile;
     }
 
-    app.get('/auth-saml/profile', utils.cors(), function (req, res, next) {
-        debug('/auth-saml/profile');
+    app.get(BASE_URL + '/profile', utils.cors(), function (req, res, next) {
+        debug(BASE_URL + '/profile');
         const validState = (req.session && req.session.userInfo && req.session.profile);
         if (!validState)
             return jsonError(res, 'No session available. Cannot retrieve profile.');
         return res.json(req.session.profile);
     });
 
-    app.get('/auth-saml/heartbeat', utils.cors(), function (req, res, next) {
-        debug('/auth-saml/heartbeart');
+    app.get(BASE_URL + '/heartbeat', utils.cors(), function (req, res, next) {
+        debug(BASE_URL + '/heartbeart');
         const validState = (req.session && req.session.userInfo);
         if (!validState)
             return jsonError(res, 'No session available. Cannot renew access token.', 403);
