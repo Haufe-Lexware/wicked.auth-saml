@@ -157,3 +157,29 @@ As `wicked.auth-passport`, `wicked.auth-saml` does not do any kind of Authorizat
 In the code you can see a large comment in the `app.post('/auth-saml/assert')` end point where additional steps could be done to actually authorize the user, e.g. retrieve licenses from a license API/database, or whatever you need.
 
 In the future, I might add a plugin entry point here, so that you could really use the plain `wicked.auth-saml` component with your production scenario, and just delegate the creation of the scopes (or rejecting the user) to an actual authorization server. 
+
+## Tweaking behaviour
+
+### Change base request path: `AUTH_SERVER_BASE`
+
+As a default, the `wicked.auth-saml` server serves from the base path `/auth-saml`. You may change this by supplying the `AUTH_SERVER_BASE` environment variable at startup. The base path needs to start with a `/` (slash) and end without a slash. Supplying an empty string is also allowed, in this case all end points are served from the root, e.g. `/profile`.
+
+```bash
+$ export AUTH_SERVER_BASE=/auth
+```
+
+### Changing session timeout: `AUTH_SERVER_SESSION_MINUTES`
+
+The default session length for the authorization server is 60 minutes. Change this value by supplying an environment variable `AUTH_SERVER_SESSION_MINUTES` before/at startup.
+
+```bash
+$ export AUTH_SERVER_SESSION_MINUTES=15
+```
+
+### Change authorization server ID: `AUTH_SERVER_NAME``
+
+The default authorization server name is `auth-saml`. This is the id which is used to retrieve the configuration data from the wicked API. You may change this name (e.g. in order to support multiple SAML SSO services) by defining the environment variable `AUTH_SERVER_NAME`.
+
+```bash
+$ export AUTH_SERVER_NAME=my-auth-server
+```
