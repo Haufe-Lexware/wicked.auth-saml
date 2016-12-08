@@ -1,6 +1,6 @@
 {
   "name": "wicked.auth-saml",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": false,
   "scripts": {
     "start": "node ./bin/auth-saml"
@@ -21,7 +21,7 @@
     "serve-favicon": "2.3.0",
     "session-file-store": "0.2.0",
     "wicked-saml": "^0.10.4",
-    "wicked-sdk": "^0.10.11"
+    "wicked-sdk": "^0.11.1"
   },
   "jshintConfig": {
     "node": true,
