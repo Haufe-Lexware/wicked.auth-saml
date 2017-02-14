@@ -12,6 +12,7 @@ const http = require('http');
 const async = require('async');
 const wicked = require('wicked-sdk');
 const wickedSaml = require('wicked-saml');
+const utils = require('../utils');
 
 let authServerId = 'auth-saml';
 if (process.env.AUTH_SERVER_NAME) {
@@ -34,8 +35,13 @@ app.set('port', port);
 
 let server = null;
 
+const wickedOptions = {
+    userAgentName: 'auth-saml',
+    userAgentVersion: utils.getVersion()
+};
+
 async.series({
-    init: callback => wicked.initialize(callback),
+    init: callback => wicked.initialize(wickedOptions, callback),
     waitForKong: callback => wicked.awaitKongAdapter(callback),
     initMachineUser: callback => wicked.initMachineUser(authServerId, callback),
     initSaml: callback => wickedSaml.initialize(wicked, authServerId, callback),

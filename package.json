@@ -1,6 +1,6 @@
 {
   "name": "wicked.auth-saml",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "private": false,
   "scripts": {
     "start": "node ./bin/auth-saml"
