@@ -1,3 +1,11 @@
+# DEPRECATED
+
+This repository is now deprecated. The main line of wicked now supports SAML authentication out of the box.
+
+See the main repository: https://github.com/Haufe-Lexware/wicked.haufe.io
+
+This repository will be removed.
+
 # Authorization Server for SAML Web SSO
 
 This repository contains the source code for a wicked.haufe.io Authorization Server needed to implement the OAuth 2.0 Implicit Flow in conjunction with SAML Web SSO (identity federation).
